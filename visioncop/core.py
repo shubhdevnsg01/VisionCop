@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, Iterable
 
 from .utils import format_timestamp, merge_timestamps
@@ -149,6 +150,7 @@ def scan_media(
     sample_rate: float = 2.0,
     merge_gap_seconds: float = 1.5,
     annotated_output: str | Path | None = None,
+    progress_callback: Callable[[int, int | None, float | None], None] | None = None,
 ) -> ScanResult:
     """Scan an image or video for occurrences of the person in reference_path."""
     cv2, face_recognition, _np = _load_dependencies()
@@ -164,6 +166,8 @@ def scan_media(
             bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             _draw_matches(cv2, bgr, matches)
             cv2.imwrite(str(annotated_output), bgr)
+        if progress_callback is not None:
+            progress_callback(1, 1, None)
         return ScanResult(str(reference), str(source), media_type, tolerance, matches, [])
 
     capture = cv2.VideoCapture(str(source))
@@ -181,6 +185,9 @@ def scan_media(
         height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(annotated_output), fourcc, fps, (width, height))
+
+    total_frames_value = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    total_frames = total_frames_value if total_frames_value > 0 else None
 
     matches: list[Match] = []
     frame_number = -1
@@ -204,6 +211,8 @@ def scan_media(
                     timestamp_seconds,
                 )
                 matches.extend(frame_matches)
+                if progress_callback is not None:
+                    progress_callback(frame_number, total_frames, timestamp_seconds)
             if writer is not None:
                 _draw_matches(cv2, frame, frame_matches)
                 writer.write(frame)
