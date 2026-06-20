@@ -38,6 +38,7 @@ class Job:
     result_path: str | None = None
     error: str | None = None
     result: dict[str, Any] | None = None
+    cancelled: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def update(self, **changes: Any) -> None:
@@ -55,6 +56,7 @@ class Job:
                 "result_path": self.result_path,
                 "error": self.error,
                 "result": self.result,
+                "cancelled": self.cancelled,
             }
 
 
@@ -116,6 +118,7 @@ def _run_job(
             merge_gap_seconds=merge_gap_seconds,
             annotated_output=annotated_output,
             progress_callback=on_progress,
+            cancellation_callback=lambda: job.cancelled,
         )
         payload = result.to_dict()
         output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -127,7 +130,10 @@ def _run_job(
             result=payload,
         )
     except Exception as exc:  # pragma: no cover - surfaced to browser for local app use
-        job.update(status="failed", error=str(exc), message="Scan failed")
+        if job.cancelled:
+            job.update(status="cancelled", error=None, message="Scan cancelled by user")
+        else:
+            job.update(status="failed", error=str(exc), message="Scan failed")
 
 
 def _web_dependency_error() -> str:
@@ -185,6 +191,16 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
         if job is None:
             return jsonify({"error": "Unknown job"}), 404
         return jsonify(job.snapshot()), 200
+
+    @app.post("/jobs/<job_id>/cancel")
+    def cancel_job(job_id: str) -> tuple[Response, int]:
+        job = JOBS.get(job_id)
+        if job is None:
+            return jsonify({"error": "Unknown job"}), 404
+        if job.status in {"complete", "failed", "cancelled"}:
+            return jsonify(job.snapshot()), 200
+        job.update(cancelled=True, status="cancelling", message="Cancelling scan...")
+        return jsonify(job.snapshot()), 202
 
     @app.get("/jobs/<job_id>/download")
     def download_result(job_id: str) -> Response | tuple[Response, int]:

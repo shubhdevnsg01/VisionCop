@@ -153,6 +153,7 @@ def scan_media(
     merge_gap_seconds: float = 1.5,
     annotated_output: str | Path | None = None,
     progress_callback: Callable[[int, int | None, float | None], None] | None = None,
+    cancellation_callback: Callable[[], bool] | None = None,
 ) -> ScanResult:
     """Scan an image or video for occurrences of the person in reference_path."""
     cv2, face_recognition, _np = _load_dependencies()
@@ -195,6 +196,9 @@ def scan_media(
     frame_number = -1
     try:
         while True:
+            if cancellation_callback is not None and cancellation_callback():
+                raise RuntimeError("Scan cancelled")
+
             ok, frame = capture.read()
             if not ok:
                 break

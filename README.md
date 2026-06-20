@@ -191,3 +191,10 @@ To enable actual face scanning on Windows, install one of these first:
    ```
 
 The error is from `dlib`, not from Flask or the web UI.
+
+
+### Why the terminal keeps printing `GET /jobs/...`
+
+While a scan is running, the browser asks the local server for job status about every 1.5 seconds. Lines like `GET /jobs/<id> HTTP/1.1 200` are normal progress polling. They do **not** mean the video is being restarted or uploaded again.
+
+A 52-second video can still take several minutes on CPU because face recognition is more expensive than simply playing the video. Start with a low sample rate such as `1` or `0.5`, leave annotated output off, and use the **Stop scan** button in the web UI if you need to cancel a run.
