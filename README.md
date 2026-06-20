@@ -198,3 +198,12 @@ The error is from `dlib`, not from Flask or the web UI.
 While a scan is running, the browser asks the local server for job status about every 1.5 seconds. Lines like `GET /jobs/<id> HTTP/1.1 200` are normal progress polling. They do **not** mean the video is being restarted or uploaded again.
 
 A 52-second video can still take several minutes on CPU because face recognition is more expensive than simply playing the video. Start with a low sample rate such as `1` or `0.5`, leave annotated output off, and use the **Stop scan** button in the web UI if you need to cancel a run.
+
+
+### How to know a scan completed successfully
+
+In the web UI, a scan is finished when the status changes to **complete**, the progress bar reaches **100%**, and the message says something like `Complete: 3 matching frame(s) found`. At that point, the **Download JSON** button appears.
+
+A scan with `Complete: 0 matching frame(s) found` is still successful: it means VisionCop finished processing the video but did not find the reference person with the current tolerance/sample settings.
+
+If the status changes to **failed**, read the error message shown under the progress bar. If the status changes to **cancelled**, the scan was stopped by the user and no final result should be treated as complete.
