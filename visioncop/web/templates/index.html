@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VisionCop Face Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">VisionCop</p>
+        <h1>Find a person in long videos</h1>
+        <p>Provide one clear face image and a video or image to scan. For very large videos, use server-side file paths so the browser does not need to upload a 10GB file.</p>
+      </section>
+
+      <form id="scan-form" class="card">
+        <h2>Start a scan</h2>
+        <div class="grid">
+          <label>
+            Reference image path
+            <input name="reference_path" type="text" placeholder="/data/person.jpg">
+          </label>
+          <label>
+            Or upload reference image
+            <input name="reference_upload" type="file" accept="image/*">
+          </label>
+          <label>
+            Video/image path
+            <input name="input_path" type="text" placeholder="/data/camera/video.mp4">
+          </label>
+          <label>
+            Or upload video/image
+            <input name="input_upload" type="file" accept="video/*,image/*">
+          </label>
+        </div>
+
+        <details>
+          <summary>Advanced settings</summary>
+          <div class="grid compact">
+            <label>Sample rate per second <input name="sample_rate" type="number" value="1" min="0.1" step="0.1"></label>
+            <label>Match tolerance <input name="tolerance" type="number" value="0.6" min="0.1" max="1" step="0.01"></label>
+            <label>Merge gap seconds <input name="merge_gap_seconds" type="number" value="1.5" min="0" step="0.1"></label>
+            <label class="checkbox"><input name="annotated_output" type="checkbox"> Write annotated video</label>
+          </div>
+        </details>
+
+        <button type="submit">Start scan</button>
+      </form>
+
+      <section id="status" class="card hidden">
+        <div class="status-row">
+          <h2>Scan status</h2>
+          <span id="status-pill" class="pill">queued</span>
+        </div>
+        <progress id="progress" value="0" max="100"></progress>
+        <p id="message">Waiting to start</p>
+        <button id="cancel" class="button danger hidden" type="button">Stop scan</button>
+        <a id="download" class="button hidden" href="#">Download JSON</a>
+        <p class="hint">Done means status <strong>complete</strong>, progress <strong>100%</strong>, and the <strong>Download JSON</strong> button appears. Terminal <code>GET /jobs/...</code> lines are normal browser progress checks, not new scans.</p>
+        <pre id="results"></pre>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
