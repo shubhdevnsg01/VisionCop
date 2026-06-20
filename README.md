@@ -20,7 +20,42 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> `face-recognition` depends on `dlib`, which may require CMake and native build tools on some systems.
+This installs the web UI, OpenCV, and NumPy. The face-recognition backend is optional at install time because it pulls in `dlib`, which often requires native C++ build tools on Windows. Install it when you are ready to run scans:
+
+```bash
+pip install -r requirements-face-recognition.txt
+```
+
+On Windows PowerShell, use the Windows activation script instead of `source`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell blocks the activation script, allow scripts for the current user and try again:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\.venv\Scripts\Activate.ps1
+```
+
+On Windows Command Prompt, use:
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+Install the optional face-recognition backend only after the web UI dependencies are working:
+
+```powershell
+pip install -r requirements-face-recognition.txt
+```
+
+> `face-recognition` depends on `dlib`, which may require CMake and native build tools on some systems. If `dlib` fails on Windows with a Visual C++ error, install **Visual Studio Build Tools** with the **Desktop development with C++** workload, or use Conda/Miniconda and install a prebuilt `dlib` package before installing `face-recognition`.
 
 ## Usage
 
@@ -108,3 +143,51 @@ This avoids copying huge files through the browser and lets OpenCV stream frames
 - Start with `--sample-rate 1` for one scan per second, then increase if you need finer timestamps.
 - Leave annotated output off for the first pass; writing a second 10GB-style video can be slow and storage-heavy.
 - Keep JSON/CSV result output enabled because those files are small and contain the occurrence timestamps.
+
+### Fix: `ModuleNotFoundError: No module named 'flask'`
+
+If the web UI fails with `ModuleNotFoundError: No module named 'flask'`, your virtual environment is active but the project dependencies have not been installed into it yet.
+
+From the activated virtual environment, run:
+
+```powershell
+pip install -r requirements.txt
+```
+
+Then start the web UI again:
+
+```powershell
+python -m visioncop.web.app
+```
+
+If you only want to install the missing web dependency, run:
+
+```powershell
+pip install Flask
+```
+
+### Fix: `dlib` fails to build on Windows
+
+If `pip install -r requirements-face-recognition.txt` fails while building `dlib` and says you must use Visual Studio to build a Python extension, the web UI dependencies can still be installed with:
+
+```powershell
+pip install -r requirements.txt
+python -m visioncop.web.app
+```
+
+To enable actual face scanning on Windows, install one of these first:
+
+1. **Visual Studio Build Tools** with the **Desktop development with C++** workload, then rerun:
+
+   ```powershell
+   pip install -r requirements-face-recognition.txt
+   ```
+
+2. Or use Conda/Miniconda for the face backend, which can provide prebuilt native packages:
+
+   ```powershell
+   conda install -c conda-forge dlib
+   pip install face-recognition
+   ```
+
+The error is from `dlib`, not from Flask or the web UI.

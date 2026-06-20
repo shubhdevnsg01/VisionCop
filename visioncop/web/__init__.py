@@ -1,5 +1,3 @@
-"""Web frontend for VisionCop."""
+"""Web frontend package for VisionCop."""
 
-from .app import create_app
-
-__all__ = ["create_app"]
+__all__ = []

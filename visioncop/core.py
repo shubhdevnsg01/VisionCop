@@ -68,8 +68,10 @@ def _load_dependencies() -> tuple[Any, Any, Any]:
         import numpy as np  # type: ignore[import-not-found]
     except ImportError as exc:
         raise RuntimeError(
-            "VisionCop requires face-recognition, opencv-python, and numpy. "
-            "Install them with `pip install -r requirements.txt`."
+            "VisionCop scanning requires the optional face-recognition backend. "
+            "Install base dependencies with `pip install -r requirements.txt`; "
+            "then install the face backend with `pip install -r requirements-face-recognition.txt`. "
+            "On Windows, dlib may require Visual Studio Build Tools with C++ support."
         ) from exc
     return cv2, face_recognition, np
 

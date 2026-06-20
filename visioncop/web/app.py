@@ -4,14 +4,23 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, render_template, request, send_file
-from werkzeug.utils import secure_filename
+try:
+    from flask import Flask, Response, jsonify, render_template, request, send_file
+    from werkzeug.utils import secure_filename
+except ImportError as exc:  # pragma: no cover - depends on optional web dependency installation
+    Flask = Response = None  # type: ignore[assignment]
+    jsonify = render_template = request = send_file = None  # type: ignore[assignment]
+    secure_filename = None  # type: ignore[assignment]
+    FLASK_IMPORT_ERROR: ImportError | None = exc
+else:
+    FLASK_IMPORT_ERROR = None
 
 from visioncop.core import scan_media
 
@@ -121,8 +130,18 @@ def _run_job(
         job.update(status="failed", error=str(exc), message="Scan failed")
 
 
-def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Flask:
+def _web_dependency_error() -> str:
+    return (
+        "The VisionCop web UI requires Flask. Install dependencies with "
+        "`pip install -r requirements.txt`, or install Flask directly with `pip install Flask`."
+    )
+
+
+def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
     """Create the VisionCop web application."""
+    if FLASK_IMPORT_ERROR is not None or Flask is None:
+        raise RuntimeError(_web_dependency_error()) from FLASK_IMPORT_ERROR
+
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = None
     run_root = Path(work_dir).resolve()
@@ -179,6 +198,10 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Flask:
 
 def main() -> int:
     """Run the local VisionCop web server."""
+    if FLASK_IMPORT_ERROR is not None:
+        print(_web_dependency_error(), file=sys.stderr)
+        return 1
+
     host = os.environ.get("VISIONCOP_HOST", "127.0.0.1")
     port = int(os.environ.get("VISIONCOP_PORT", "7860"))
     create_app().run(host=host, port=port, threaded=True)

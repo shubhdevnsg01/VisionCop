@@ -9,11 +9,13 @@ description = "Find occurrences of a reference face in images and videos."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "face-recognition>=1.3.0",
   "opencv-python>=4.8.0",
   "numpy>=1.24.0",
   "Flask>=3.0.0",
 ]
+
+[project.optional-dependencies]
+face = ["face-recognition>=1.3.0"]
 
 [project.scripts]
 visioncop = "visioncop.cli:main"
