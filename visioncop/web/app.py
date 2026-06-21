@@ -164,6 +164,13 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
     run_root = Path(work_dir).resolve()
     run_root.mkdir(parents=True, exist_ok=True)
 
+
+    @app.after_request
+    def add_cache_headers(response: Response) -> Response:
+        if request.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/")
     def index() -> str:
         return render_template("index.html")
