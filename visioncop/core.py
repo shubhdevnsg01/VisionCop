@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from collections.abc import Callable
+import importlib.util
 from typing import Any, Iterable
 
 from .utils import format_timestamp, merge_timestamps
@@ -33,6 +34,7 @@ class Match:
     distance: float
     confidence: float
     box: Box
+    snapshot_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,17 +64,26 @@ class ScanResult:
 
 
 def _load_dependencies() -> tuple[Any, Any, Any]:
-    try:
-        import cv2  # type: ignore[import-not-found]
-        import face_recognition  # type: ignore[import-not-found]
-        import numpy as np  # type: ignore[import-not-found]
-    except ImportError as exc:
+    required_modules = {
+        "cv2": "opencv-python",
+        "numpy": "numpy",
+        "pkg_resources": "setuptools",
+        "face_recognition_models": "face-recognition-models",
+        "face_recognition": "face-recognition",
+    }
+    missing = [package for module, package in required_modules.items() if importlib.util.find_spec(module) is None]
+    if missing:
+        missing_list = ", ".join(missing)
         raise RuntimeError(
-            "VisionCop scanning requires the optional face-recognition backend. "
-            "Install base dependencies with `pip install -r requirements.txt`; "
-            "then install the face backend with `pip install -r requirements-face-recognition.txt`. "
-            "On Windows, dlib may require Visual Studio Build Tools with C++ support."
-        ) from exc
+            "VisionCop scanning is missing required package(s): "
+            f"{missing_list}. Run `python -m pip install -r requirements-face-recognition.txt` "
+            "inside the same activated virtual environment that starts the web server, then restart the server."
+        )
+
+    import cv2  # type: ignore[import-not-found]
+    import face_recognition  # type: ignore[import-not-found]
+    import numpy as np  # type: ignore[import-not-found]
+
     return cv2, face_recognition, np
 
 
@@ -144,6 +155,39 @@ def _draw_matches(cv2: Any, frame: Any, matches: Iterable[Match]) -> None:
         cv2.putText(frame, label, (box.left, max(0, box.top - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
 
+def _save_match_snapshots(
+    cv2: Any,
+    frame: Any,
+    matches: list[Match],
+    snapshot_dir: Path | None,
+    seen_seconds: set[int],
+) -> list[Match]:
+    if snapshot_dir is None or not matches:
+        return matches
+
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    height, width = frame.shape[:2]
+    updated: list[Match] = []
+    for match in matches:
+        second = int(match.timestamp_seconds or 0)
+        if second in seen_seconds:
+            updated.append(match)
+            continue
+        seen_seconds.add(second)
+        box = match.box
+        padding = 32
+        top = max(0, box.top - padding)
+        right = min(width, box.right + padding)
+        bottom = min(height, box.bottom + padding)
+        left = max(0, box.left - padding)
+        crop = frame[top:bottom, left:right]
+        filename = f"match_{second:06d}s_frame_{match.frame or 0:08d}.jpg"
+        output = snapshot_dir / filename
+        cv2.imwrite(str(output), crop)
+        updated.append(replace(match, snapshot_path=str(output)))
+    return updated
+
+
 def scan_media(
     reference_path: str | Path,
     input_path: str | Path,
@@ -152,6 +196,7 @@ def scan_media(
     sample_rate: float = 2.0,
     merge_gap_seconds: float = 1.5,
     annotated_output: str | Path | None = None,
+    snapshot_dir: str | Path | None = None,
     progress_callback: Callable[[int, int | None, float | None], None] | None = None,
     cancellation_callback: Callable[[], bool] | None = None,
 ) -> ScanResult:
@@ -165,8 +210,9 @@ def scan_media(
     if media_type == "image":
         image = face_recognition.load_image_file(str(source))
         matches = _matches_in_rgb_frame(image, reference_encoding, face_recognition, tolerance, None, None)
+        bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        matches = _save_match_snapshots(cv2, bgr, matches, Path(snapshot_dir) if snapshot_dir else None, set())
         if annotated_output:
-            bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             _draw_matches(cv2, bgr, matches)
             cv2.imwrite(str(annotated_output), bgr)
         if progress_callback is not None:
@@ -192,6 +238,9 @@ def scan_media(
     total_frames_value = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     total_frames = total_frames_value if total_frames_value > 0 else None
 
+    snapshots = Path(snapshot_dir) if snapshot_dir else None
+    snapshot_seconds: set[int] = set()
+
     matches: list[Match] = []
     frame_number = -1
     try:
@@ -216,6 +265,7 @@ def scan_media(
                     frame_number,
                     timestamp_seconds,
                 )
+                frame_matches = _save_match_snapshots(cv2, frame, frame_matches, snapshots, snapshot_seconds)
                 matches.extend(frame_matches)
                 if progress_callback is not None:
                     progress_callback(frame_number, total_frames, timestamp_seconds)

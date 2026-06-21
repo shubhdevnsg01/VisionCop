@@ -28,3 +28,15 @@ pre { white-space: pre-wrap; overflow-x: auto; }
 .danger { background: #fb7185; color: #3b0711; }
 .hint { color: #93a4bd; font-size: .92rem; }
 code { color: #bae6fd; }
+
+.results { margin-top: 18px; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.summary-grid section { background: rgba(255,255,255,.08); border-radius: 16px; padding: 16px; }
+.metric { display: block; font-size: 2rem; font-weight: 900; color: #7dd3fc; }
+.timeline { line-height: 1.9; }
+.snapshot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.snapshot-card { background: rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.12); }
+.snapshot-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.snapshot-card div { display: grid; gap: 4px; padding: 12px; }
+.snapshot-card span { color: #a8bdd8; }
+@media (max-width: 760px) { .summary-grid { grid-template-columns: 1fr; } }

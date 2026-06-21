@@ -207,3 +207,61 @@ In the web UI, a scan is finished when the status changes to **complete**, the p
 A scan with `Complete: 0 matching frame(s) found` is still successful: it means VisionCop finished processing the video but did not find the reference person with the current tolerance/sample settings.
 
 If the status changes to **failed**, read the error message shown under the progress bar. If the status changes to **cancelled**, the scan was stopped by the user and no final result should be treated as complete.
+
+### Fix: `Please install face_recognition_models`
+
+If the server prints `Please install face_recognition_models with this command before using face_recognition`, the web server is running but the face-recognition model package is missing from the active virtual environment.
+
+Run this inside the activated virtual environment:
+
+```powershell
+pip install face-recognition-models
+pip install -r requirements-face-recognition.txt
+```
+
+Then stop and restart the web server:
+
+```powershell
+python -m visioncop.web.app
+```
+
+The repeated `GET /jobs/... 200` lines are still normal status polling; the important line is the missing `face_recognition_models` message.
+
+
+### If `face_recognition_models` still appears after installing it
+
+Make sure you installed the package into the exact Python environment that runs the server. In PowerShell, stop the server with `CTRL+C`, keep `(.venv)` activated, and run:
+
+```powershell
+python -m pip install --upgrade face-recognition-models face-recognition
+python -c "import sys, face_recognition_models; print(sys.executable); print(face_recognition_models.__file__)"
+python -m visioncop.web.app
+```
+
+Use `python -m pip`, not plain `pip`, to guarantee the install goes into the same interpreter shown by `sys.executable`.
+
+
+### Fix: `No module named 'pkg_resources'`
+
+If importing `face_recognition_models` fails with `ModuleNotFoundError: No module named 'pkg_resources'`, install or upgrade `setuptools` in the active virtual environment:
+
+```powershell
+python -m pip install --upgrade setuptools
+python -m pip install -r requirements-face-recognition.txt
+python -c "import sys, face_recognition_models; print(sys.executable); print(face_recognition_models.__file__)"
+```
+
+`face_recognition_models` imports `pkg_resources`, which is provided by `setuptools`.
+
+
+### If `pkg_resources` is still missing with new setuptools
+
+Some newer setuptools releases no longer expose the legacy `pkg_resources` module expected by `face_recognition_models`. Downgrade setuptools to a compatible runtime version in the active virtual environment:
+
+```powershell
+python -m pip install --force-reinstall "setuptools>=68,<81"
+python -m pip install -r requirements-face-recognition.txt
+python -c "import pkg_resources, face_recognition_models; print(face_recognition_models.__file__)"
+```
+
+After that command succeeds, restart the web server with `python -m visioncop.web.app`.

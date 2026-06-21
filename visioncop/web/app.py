@@ -88,6 +88,15 @@ def _resolve_input(field_name: str, upload_name: str, destination: Path) -> Path
     return uploaded
 
 
+
+def _attach_snapshot_urls(payload: dict[str, Any], job_id: str) -> dict[str, Any]:
+    for match in payload.get("matches", []):
+        snapshot_path = match.get("snapshot_path")
+        if not snapshot_path:
+            continue
+        match["snapshot_url"] = f"/jobs/{job_id}/snapshots/{Path(snapshot_path).name}"
+    return payload
+
 def _run_job(
     job: Job,
     reference_path: Path,
@@ -97,6 +106,7 @@ def _run_job(
     merge_gap_seconds: float,
     annotated_output: Path | None,
     output_json: Path,
+    snapshot_dir: Path,
 ) -> None:
     def on_progress(frame: int, total_frames: int | None, timestamp: float | None) -> None:
         if total_frames:
@@ -117,10 +127,11 @@ def _run_job(
             sample_rate=sample_rate,
             merge_gap_seconds=merge_gap_seconds,
             annotated_output=annotated_output,
+            snapshot_dir=snapshot_dir,
             progress_callback=on_progress,
             cancellation_callback=lambda: job.cancelled,
         )
-        payload = result.to_dict()
+        payload = _attach_snapshot_urls(result.to_dict(), job.id)
         output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         job.update(
             status="complete",
@@ -175,11 +186,12 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
 
         annotated_output = job_dir / "annotated.mp4" if annotated else None
         output_json = job_dir / "occurrences.json"
+        snapshot_dir = job_dir / "snapshots"
         job = Job(id=job_id)
         JOBS[job_id] = job
         thread = threading.Thread(
             target=_run_job,
-            args=(job, reference_path, input_path, tolerance, sample_rate, merge_gap_seconds, annotated_output, output_json),
+            args=(job, reference_path, input_path, tolerance, sample_rate, merge_gap_seconds, annotated_output, output_json, snapshot_dir),
             daemon=True,
         )
         thread.start()
@@ -201,6 +213,13 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
             return jsonify(job.snapshot()), 200
         job.update(cancelled=True, status="cancelling", message="Cancelling scan...")
         return jsonify(job.snapshot()), 202
+
+    @app.get("/jobs/<job_id>/snapshots/<filename>")
+    def get_snapshot(job_id: str, filename: str) -> Response | tuple[Response, int]:
+        path = run_root / job_id / "snapshots" / filename
+        if not path.exists():
+            return jsonify({"error": "Snapshot not found"}), 404
+        return send_file(path)
 
     @app.get("/jobs/<job_id>/download")
     def download_result(job_id: str) -> Response | tuple[Response, int]:
