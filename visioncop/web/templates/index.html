@@ -23,7 +23,8 @@
           </label>
           <label>
             Or upload specimen image(s)
-            <input name="reference_upload" type="file" accept="image/*" multiple>
+            <input id="reference-upload" name="reference_upload" type="file" accept="image/*" multiple>
+            <div id="reference-preview" class="preview-grid" aria-live="polite"></div>
           </label>
           <label>
             Video/image path(s)
@@ -31,7 +32,8 @@
           </label>
           <label>
             Or upload video/image
-            <input name="input_upload" type="file" accept="video/*,image/*" multiple>
+            <input id="input-upload" name="input_upload" type="file" accept="video/*,image/*" multiple>
+            <div id="input-preview" class="preview-grid" aria-live="polite"></div>
           </label>
         </div>
 
@@ -46,6 +48,7 @@
           </div>
         </details>
 
+        <p class="hint">Upload previews show local files before scanning. Server-side path previews appear after scanning as matched snapshots.</p>
         <button type="submit">Start scan</button>
       </form>
 

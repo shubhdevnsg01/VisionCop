@@ -44,3 +44,9 @@ code { color: #bae6fd; }
 .run-card { margin-top: 18px; padding: 16px; border: 1px solid rgba(255,255,255,.14); border-radius: 18px; background: rgba(0,0,0,.14); }
 .run-card h4 { margin-bottom: 8px; color: #bae6fd; }
 select { border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 12px 14px; background: rgba(0,0,0,.24); color: #fff; }
+
+.preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 8px; }
+.preview-card { border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.18); border-radius: 12px; padding: 8px; overflow: hidden; }
+.preview-card img, .preview-card video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; display: block; background: #0f172a; }
+.preview-card span { display: block; margin-top: 6px; color: #cbd5e1; font-size: .78rem; overflow-wrap: anywhere; }
+.file-placeholder { display: grid; place-items: center; aspect-ratio: 16 / 10; border-radius: 8px; background: rgba(255,255,255,.08); }

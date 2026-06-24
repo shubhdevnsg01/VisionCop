@@ -1,4 +1,8 @@
 const form = document.querySelector('#scan-form');
+const referenceUpload = document.querySelector('#reference-upload');
+const inputUpload = document.querySelector('#input-upload');
+const referencePreview = document.querySelector('#reference-preview');
+const inputPreview = document.querySelector('#input-preview');
 const statusCard = document.querySelector('#status');
 const statusPill = document.querySelector('#status-pill');
 const progress = document.querySelector('#progress');
@@ -9,6 +13,46 @@ const cancel = document.querySelector('#cancel');
 
 let pollTimer;
 let currentJobId;
+
+
+function renderUploadPreview(input, container) {
+  container.innerHTML = '';
+  Array.from(input.files || []).forEach((file) => {
+    const url = URL.createObjectURL(file);
+    const card = document.createElement('article');
+    card.className = 'preview-card';
+    const label = document.createElement('span');
+    label.textContent = file.name;
+
+    if (file.type.startsWith('image/')) {
+      const image = document.createElement('img');
+      image.src = url;
+      image.alt = `Preview of ${file.name}`;
+      image.onload = () => URL.revokeObjectURL(url);
+      card.appendChild(image);
+    } else if (file.type.startsWith('video/')) {
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.controls = true;
+      video.preload = 'metadata';
+      video.onloadeddata = () => { video.currentTime = 0; };
+      card.appendChild(video);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'file-placeholder';
+      placeholder.textContent = 'File';
+      card.appendChild(placeholder);
+    }
+
+    card.appendChild(label);
+    container.appendChild(card);
+  });
+}
+
+referenceUpload.addEventListener('change', () => renderUploadPreview(referenceUpload, referencePreview));
+inputUpload.addEventListener('change', () => renderUploadPreview(inputUpload, inputPreview));
+
 
 async function pollJob(jobId) {
   const response = await fetch(`/jobs/${jobId}`);
