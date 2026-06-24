@@ -4,13 +4,63 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>VisionCop Face & Object Search</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='react-ui-1') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='react-ui-2') }}">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="app-shell">
+        <section class="hero-panel">
+          <div>
+            <p class="eyebrow">VisionCop AI Scanner</p>
+            <h1>Find people, vehicles, plates, and objects in video.</h1>
+            <p>Upload one or more specimens and scan one or more videos. The full React UI loads automatically when available; this built-in fallback keeps the app usable offline.</p>
+          </div>
+          <div class="hero-card"><span>Modes</span><strong>Face + Object</strong><small>Offline-safe fallback</small></div>
+        </section>
+
+        <form id="scan-form" class="glass-card form-card">
+          <div class="section-title"><p class="eyebrow">Step 1</p><h2>Select specimens and videos</h2></div>
+          <div class="form-grid">
+            <label>Specimen/reference path(s)<input name="reference_path" type="text" placeholder="/data/person.jpg; /data/car.jpg"></label>
+            <label>Upload specimen image(s)<input id="reference-upload" name="reference_upload" type="file" accept="image/*" multiple><div id="reference-preview" class="preview-grid" aria-live="polite"></div></label>
+            <label>Video/image path(s)<input name="input_path" type="text" placeholder="/data/camera/video1.mp4; /data/camera/video2.mp4"></label>
+            <label>Upload video/image(s)<input id="input-upload" name="input_upload" type="file" accept="video/*,image/*" multiple><div id="input-preview" class="preview-grid" aria-live="polite"></div></label>
+          </div>
+          <div class="section-title"><p class="eyebrow">Step 2</p><h2>Choose detection settings</h2></div>
+          <div class="form-grid settings-grid">
+            <label>Detection mode <select id="mode-select" name="mode"><option value="face">Face/person</option><option value="image">Object/photo/number plate/car</option></select></label>
+            <div id="mode-warning" class="mode-warning" role="status"></div>
+            <label>Sample rate per second <input name="sample_rate" type="number" value="1" min="0.1" step="0.1"></label>
+            <label>Match tolerance <input name="tolerance" type="number" value="0.6" min="0.1" max="1" step="0.01"></label>
+            <label>Merge gap seconds <input name="merge_gap_seconds" type="number" value="1.5" min="0" step="0.1"></label>
+            <label class="checkbox"><input name="annotated_output" type="checkbox"> Write annotated video</label>
+          </div>
+          <div class="actions"><button class="button" type="submit">Start scan</button></div>
+        </form>
+
+        <section id="status" class="glass-card status-card hidden">
+          <div class="status-head"><div><p class="eyebrow">Step 3</p><h2>Scan status</h2></div><span id="status-pill" class="pill">queued</span></div>
+          <progress id="progress" value="0" max="100"></progress>
+          <p id="message" class="status-message">Waiting to start</p>
+          <button id="cancel" class="button danger hidden" type="button">Stop scan</button>
+          <a id="download" class="button secondary hidden" href="#">Download JSON</a>
+          <p class="hint">React CDN could not load, so VisionCop is using the offline fallback UI. Scanning still works.</p>
+          <div id="results" class="results"></div>
+        </section>
+      </main>
+    </div>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="text/babel" src="{{ url_for('static', filename='react-app.jsx', v='react-ui-1') }}"></script>
+    <script type="text/babel" src="{{ url_for('static', filename='react-app.jsx', v='react-ui-2') }}"></script>
+    <script>
+      window.addEventListener('load', function () {
+        if (!window.React || !window.ReactDOM) {
+          var fallback = document.createElement('script');
+          fallback.src = "{{ url_for('static', filename='app.js', v='offline-fallback-1') }}";
+          document.body.appendChild(fallback);
+        }
+      });
+    </script>
   </body>
 </html>
