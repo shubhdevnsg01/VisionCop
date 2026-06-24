@@ -1,5 +1,7 @@
 const form = document.querySelector('#scan-form');
 const referenceUpload = document.querySelector('#reference-upload');
+const modeSelect = document.querySelector('#mode-select');
+const modeWarning = document.querySelector('#mode-warning');
 const inputUpload = document.querySelector('#input-upload');
 const referencePreview = document.querySelector('#reference-preview');
 const inputPreview = document.querySelector('#input-preview');
@@ -14,6 +16,21 @@ const cancel = document.querySelector('#cancel');
 let pollTimer;
 let currentJobId;
 
+
+
+function updateModeWarning() {
+  if (modeSelect.value === 'face') {
+    modeWarning.className = 'mode-warning info';
+    modeWarning.textContent = 'Face/person mode is selected. Use this when the specimen is a human face; the app will validate the reference image as a face.';
+    return;
+  }
+
+  modeWarning.className = 'mode-warning warn';
+  modeWarning.textContent = 'Object/photo/number plate/car mode does not perform face identity recognition. If your specimen is a person face, switch back to Face/person mode.';
+}
+
+modeSelect.addEventListener('change', updateModeWarning);
+updateModeWarning();
 
 function renderUploadPreview(input, container) {
   container.innerHTML = '';
@@ -97,6 +114,15 @@ form.addEventListener('submit', async (event) => {
   statusPill.textContent = 'queued';
   progress.value = 0;
   message.textContent = 'Submitting job...';
+
+  if (modeSelect.value === 'image') {
+    const proceed = confirm('Object/photo mode will not recognize a person by face. Use Face/person mode for human faces. Continue with object/photo mode?');
+    if (!proceed) {
+      statusPill.textContent = 'cancelled';
+      message.textContent = 'Switch to Face/person mode if your specimen is a human face.';
+      return;
+    }
+  }
 
   const response = await fetch('/jobs', { method: 'POST', body: new FormData(form) });
   const payload = await response.json();
