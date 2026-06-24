@@ -37,12 +37,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Find a reference person's face in an image or video.")
     parser.add_argument("--reference", required=True, help="Image containing exactly one face to search for.")
     parser.add_argument("--input", required=True, help="Image or video to scan.")
+    parser.add_argument("--mode", choices=["face", "image"], default="face", help="Detection mode: face/person or generic image/object matching.")
     parser.add_argument("--tolerance", type=float, default=0.6, help="Face distance threshold; lower is stricter. Default: 0.6")
     parser.add_argument("--sample-rate", type=float, default=2.0, help="Video frames to scan per second. Default: 2")
     parser.add_argument("--merge-gap-seconds", type=float, default=1.5, help="Gap for merging video matches into occurrences.")
     parser.add_argument("--output-json", help="Path to write JSON results. Prints to stdout if omitted.")
     parser.add_argument("--output-csv", help="Path to write per-match CSV results.")
     parser.add_argument("--annotated-output", help="Optional path for annotated image/video output.")
+    parser.add_argument("--snapshot-dir", help="Optional directory to save matched snapshot images.")
     return parser
 
 
@@ -54,9 +56,11 @@ def main() -> int:
         args.reference,
         args.input,
         tolerance=args.tolerance,
+        mode=args.mode,
         sample_rate=args.sample_rate,
         merge_gap_seconds=args.merge_gap_seconds,
         annotated_output=args.annotated_output,
+        snapshot_dir=args.snapshot_dir,
     )
     payload = result.to_dict()
 

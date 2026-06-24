@@ -188,6 +188,46 @@ def _save_match_snapshots(
     return updated
 
 
+
+def _generic_image_matches(
+    cv2: Any,
+    np: Any,
+    specimen_bgr: Any,
+    frame_bgr: Any,
+    tolerance: float,
+    frame_number: int | None,
+    timestamp_seconds: float | None,
+) -> list[Match]:
+    specimen_gray = cv2.cvtColor(specimen_bgr, cv2.COLOR_BGR2GRAY)
+    frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+    orb = cv2.ORB_create(nfeatures=1200)
+    specimen_keypoints, specimen_desc = orb.detectAndCompute(specimen_gray, None)
+    frame_keypoints, frame_desc = orb.detectAndCompute(frame_gray, None)
+    if specimen_desc is None or frame_desc is None or not specimen_keypoints or not frame_keypoints:
+        return []
+
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+    raw_matches = matcher.knnMatch(specimen_desc, frame_desc, k=2)
+    good = [pair[0] for pair in raw_matches if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance]
+    min_matches = max(8, int(30 * (1.0 - min(max(tolerance, 0.1), 0.95))))
+    if len(good) < min_matches:
+        return []
+
+    confidence = min(1.0, len(good) / max(min_matches * 2, 1))
+    height, width = frame_bgr.shape[:2]
+    box = Box(top=0, right=width, bottom=height, left=0)
+    return [
+        Match(
+            frame=frame_number,
+            timestamp_seconds=timestamp_seconds,
+            timestamp=format_timestamp(timestamp_seconds),
+            distance=round(1.0 - confidence, 6),
+            confidence=round(confidence, 6),
+            box=box,
+        )
+    ]
+
+
 def scan_media(
     reference_path: str | Path,
     input_path: str | Path,
@@ -196,21 +236,31 @@ def scan_media(
     sample_rate: float = 2.0,
     merge_gap_seconds: float = 1.5,
     annotated_output: str | Path | None = None,
+    mode: str = "face",
     snapshot_dir: str | Path | None = None,
     progress_callback: Callable[[int, int | None, float | None], None] | None = None,
     cancellation_callback: Callable[[], bool] | None = None,
 ) -> ScanResult:
     """Scan an image or video for occurrences of the person in reference_path."""
-    cv2, face_recognition, _np = _load_dependencies()
+    cv2, face_recognition, np = _load_dependencies()
     reference = Path(reference_path)
     source = Path(input_path)
     media_type = detect_media_type(source)
-    reference_encoding = _reference_encoding(reference, face_recognition)
+    if mode not in {"face", "image"}:
+        raise ValueError("mode must be either 'face' or 'image'")
+    reference_encoding = _reference_encoding(reference, face_recognition) if mode == "face" else None
+    specimen_bgr = cv2.imread(str(reference)) if mode == "image" else None
+    if mode == "image" and specimen_bgr is None:
+        raise ValueError(f"Unable to read specimen image: {reference}")
 
     if media_type == "image":
         image = face_recognition.load_image_file(str(source))
-        matches = _matches_in_rgb_frame(image, reference_encoding, face_recognition, tolerance, None, None)
         bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        matches = (
+            _matches_in_rgb_frame(image, reference_encoding, face_recognition, tolerance, None, None)
+            if mode == "face"
+            else _generic_image_matches(cv2, np, specimen_bgr, bgr, tolerance, None, None)
+        )
         matches = _save_match_snapshots(cv2, bgr, matches, Path(snapshot_dir) if snapshot_dir else None, set())
         if annotated_output:
             _draw_matches(cv2, bgr, matches)
@@ -257,13 +307,17 @@ def scan_media(
             if should_scan:
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 timestamp_seconds = frame_number / fps
-                frame_matches = _matches_in_rgb_frame(
-                    rgb_frame,
-                    reference_encoding,
-                    face_recognition,
-                    tolerance,
-                    frame_number,
-                    timestamp_seconds,
+                frame_matches = (
+                    _matches_in_rgb_frame(
+                        rgb_frame,
+                        reference_encoding,
+                        face_recognition,
+                        tolerance,
+                        frame_number,
+                        timestamp_seconds,
+                    )
+                    if mode == "face"
+                    else _generic_image_matches(cv2, np, specimen_bgr, frame, tolerance, frame_number, timestamp_seconds)
                 )
                 frame_matches = _save_match_snapshots(cv2, frame, frame_matches, snapshots, snapshot_seconds)
                 matches.extend(frame_matches)

@@ -265,3 +265,12 @@ python -c "import pkg_resources, face_recognition_models; print(face_recognition
 ```
 
 After that command succeeds, restart the web server with `python -m visioncop.web.app`.
+
+
+## Multiple specimens, multiple videos, and object mode
+
+The web UI supports more than one specimen/reference image and more than one input video/image in a single job. Use the upload controls with multiple files, or enter server-side paths separated by semicolons or new lines.
+
+Use **Face/person** mode when the specimen is a person's face. Use **Object/photo/number plate/car** mode when the specimen is a general image target such as a vehicle, number plate, object, logo, or photo. Results are grouped by specimen and test video, and timestamps are listed before the matched snapshot images.
+
+For large or multiple videos, start with a low sample rate such as `0.5` or `1` and keep annotated output off for the first pass.

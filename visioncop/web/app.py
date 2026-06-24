@@ -63,30 +63,34 @@ class Job:
 JOBS: dict[str, Job] = {}
 
 
-def _save_upload(field_name: str, destination: Path) -> Path | None:
-    upload = request.files.get(field_name)
-    if upload is None or not upload.filename:
-        return None
+def _save_uploads(field_name: str, destination: Path) -> list[Path]:
+    outputs: list[Path] = []
+    for upload in request.files.getlist(field_name):
+        if upload is None or not upload.filename:
+            continue
+        safe_name = secure_filename(upload.filename) or f"{field_name}.bin"
+        output = destination / safe_name
+        upload.save(output)
+        outputs.append(output)
+    return outputs
 
-    safe_name = secure_filename(upload.filename) or f"{field_name}.bin"
-    output = destination / safe_name
-    upload.save(output)
-    return output
+
+def _split_paths(value: str) -> list[str]:
+    return [part.strip() for chunk in value.splitlines() for part in chunk.split(";") if part.strip()]
 
 
-def _resolve_input(field_name: str, upload_name: str, destination: Path) -> Path:
-    path_value = request.form.get(field_name, "").strip()
-    if path_value:
-        path = Path(path_value).expanduser().resolve()
+def _resolve_inputs(field_name: str, upload_name: str, destination: Path) -> list[Path]:
+    paths: list[Path] = []
+    for path_text in _split_paths(request.form.get(field_name, "")):
+        path = Path(path_text).expanduser().resolve()
         if not path.exists():
             raise ValueError(f"File path does not exist: {path}")
-        return path
+        paths.append(path)
 
-    uploaded = _save_upload(upload_name, destination)
-    if uploaded is None:
-        raise ValueError(f"Provide a file path or upload for {field_name}.")
-    return uploaded
-
+    paths.extend(_save_uploads(upload_name, destination))
+    if not paths:
+        raise ValueError(f"Provide one or more file paths or uploads for {field_name}.")
+    return paths
 
 
 def _attach_snapshot_urls(payload: dict[str, Any], job_id: str) -> dict[str, Any]:
@@ -99,14 +103,15 @@ def _attach_snapshot_urls(payload: dict[str, Any], job_id: str) -> dict[str, Any
 
 def _run_job(
     job: Job,
-    reference_path: Path,
-    input_path: Path,
+    reference_paths: list[Path],
+    input_paths: list[Path],
     tolerance: float,
     sample_rate: float,
     merge_gap_seconds: float,
     annotated_output: Path | None,
     output_json: Path,
     snapshot_dir: Path,
+    mode: str,
 ) -> None:
     def on_progress(frame: int, total_frames: int | None, timestamp: float | None) -> None:
         if total_frames:
@@ -120,23 +125,40 @@ def _run_job(
 
     try:
         job.update(status="running", progress=0.0, message="Starting scan")
-        result = scan_media(
-            reference_path,
-            input_path,
-            tolerance=tolerance,
-            sample_rate=sample_rate,
-            merge_gap_seconds=merge_gap_seconds,
-            annotated_output=annotated_output,
-            snapshot_dir=snapshot_dir,
-            progress_callback=on_progress,
-            cancellation_callback=lambda: job.cancelled,
-        )
-        payload = _attach_snapshot_urls(result.to_dict(), job.id)
+        runs: list[dict[str, Any]] = []
+        total_matches = 0
+        total_runs = len(reference_paths) * len(input_paths)
+        run_number = 0
+        for reference_path in reference_paths:
+            for input_path in input_paths:
+                run_number += 1
+                if job.cancelled:
+                    raise RuntimeError("Scan cancelled")
+                job.update(message=f"Scanning {run_number}/{total_runs}: {reference_path.name} in {input_path.name}")
+                result = scan_media(
+                    reference_path,
+                    input_path,
+                    tolerance=tolerance,
+                    sample_rate=sample_rate,
+                    merge_gap_seconds=merge_gap_seconds,
+                    annotated_output=annotated_output if total_runs == 1 else None,
+                    mode=mode,
+                    snapshot_dir=snapshot_dir / f"run_{run_number}",
+                    progress_callback=on_progress,
+                    cancellation_callback=lambda: job.cancelled,
+                )
+                run_payload = _attach_snapshot_urls(result.to_dict(), job.id)
+                run_payload["reference_name"] = reference_path.name
+                run_payload["input_name"] = input_path.name
+                runs.append(run_payload)
+                total_matches += len(result.matches)
+
+        payload = {"mode": mode, "runs": runs, "matches": [match for run in runs for match in run.get("matches", [])], "occurrences": [item for run in runs for item in run.get("occurrences", [])]}
         output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         job.update(
             status="complete",
             progress=100.0,
-            message=f"Complete: {len(result.matches)} matching frame(s) found",
+            message=f"Complete: {total_matches} matching frame(s) found across {total_runs} scan(s)",
             result_path=str(output_json),
             result=payload,
         )
@@ -182,12 +204,13 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
         job_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            reference_path = _resolve_input("reference_path", "reference_upload", job_dir)
-            input_path = _resolve_input("input_path", "input_upload", job_dir)
+            reference_paths = _resolve_inputs("reference_path", "reference_upload", job_dir)
+            input_paths = _resolve_inputs("input_path", "input_upload", job_dir)
             tolerance = float(request.form.get("tolerance", 0.6))
             sample_rate = float(request.form.get("sample_rate", 2.0))
             merge_gap_seconds = float(request.form.get("merge_gap_seconds", 1.5))
             annotated = request.form.get("annotated_output") == "on"
+            mode = request.form.get("mode", "face")
         except Exception as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -198,7 +221,7 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
         JOBS[job_id] = job
         thread = threading.Thread(
             target=_run_job,
-            args=(job, reference_path, input_path, tolerance, sample_rate, merge_gap_seconds, annotated_output, output_json, snapshot_dir),
+            args=(job, reference_paths, input_paths, tolerance, sample_rate, merge_gap_seconds, annotated_output, output_json, snapshot_dir, mode),
             daemon=True,
         )
         thread.start()
@@ -223,10 +246,11 @@ def create_app(work_dir: Path | str = DEFAULT_WORK_DIR) -> Any:
 
     @app.get("/jobs/<job_id>/snapshots/<filename>")
     def get_snapshot(job_id: str, filename: str) -> Response | tuple[Response, int]:
-        path = run_root / job_id / "snapshots" / filename
-        if not path.exists():
+        snapshot_root = run_root / job_id / "snapshots"
+        matches = list(snapshot_root.rglob(filename))
+        if not matches:
             return jsonify({"error": "Snapshot not found"}), 404
-        return send_file(path)
+        return send_file(matches[0])
 
     @app.get("/jobs/<job_id>/download")
     def download_result(job_id: str) -> Response | tuple[Response, int]:

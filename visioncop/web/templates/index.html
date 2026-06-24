@@ -11,33 +11,34 @@
       <section class="hero">
         <p class="eyebrow">VisionCop</p>
         <h1>Find a person in long videos</h1>
-        <p>Provide one clear face image and a video or image to scan. For very large videos, use server-side file paths so the browser does not need to upload a 10GB file.</p>
+        <p>Provide one or more specimen images — face, object, number plate, car, or photo — and one or more videos/images to scan. For very large videos, use server-side file paths so the browser does not need to upload a 10GB file.</p>
       </section>
 
       <form id="scan-form" class="card">
         <h2>Start a scan</h2>
         <div class="grid">
           <label>
-            Reference image path
-            <input name="reference_path" type="text" placeholder="/data/person.jpg">
+            Specimen/reference image path(s)
+            <input name="reference_path" type="text" placeholder="/data/person.jpg; /data/car.jpg">
           </label>
           <label>
-            Or upload reference image
-            <input name="reference_upload" type="file" accept="image/*">
+            Or upload specimen image(s)
+            <input name="reference_upload" type="file" accept="image/*" multiple>
           </label>
           <label>
-            Video/image path
-            <input name="input_path" type="text" placeholder="/data/camera/video.mp4">
+            Video/image path(s)
+            <input name="input_path" type="text" placeholder="/data/camera/video1.mp4; /data/camera/video2.mp4">
           </label>
           <label>
             Or upload video/image
-            <input name="input_upload" type="file" accept="video/*,image/*">
+            <input name="input_upload" type="file" accept="video/*,image/*" multiple>
           </label>
         </div>
 
         <details>
           <summary>Advanced settings</summary>
           <div class="grid compact">
+            <label>Detection mode <select name="mode"><option value="face">Face/person</option><option value="image">Object/photo/number plate/car</option></select></label>
             <label>Sample rate per second <input name="sample_rate" type="number" value="1" min="0.1" step="0.1"></label>
             <label>Match tolerance <input name="tolerance" type="number" value="0.6" min="0.1" max="1" step="0.01"></label>
             <label>Merge gap seconds <input name="merge_gap_seconds" type="number" value="1.5" min="0" step="0.1"></label>
