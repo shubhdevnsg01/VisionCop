@@ -13,9 +13,9 @@
           <div>
             <p class="eyebrow">VisionCop AI Scanner</p>
             <h1>Find people, vehicles, plates, and objects in video.</h1>
-            <p>Upload one or more specimens and scan one or more videos. The full React UI loads automatically when available; this built-in fallback keeps the app usable offline.</p>
+            <p>Upload one or more specimens and scan one or more videos. This offline-safe interface runs locally without external frontend CDNs, so uploads and scanning keep working even when React/Babel CDNs fail.</p>
           </div>
-          <div class="hero-card"><span>Modes</span><strong>Face + Object</strong><small>Offline-safe fallback</small></div>
+          <div class="hero-card"><span>Modes</span><strong>Face + Object</strong><small>Offline-safe local UI</small></div>
         </section>
 
         <form id="scan-form" class="glass-card form-card">
@@ -49,18 +49,6 @@
         </section>
       </main>
     </div>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="text/babel" src="{{ url_for('static', filename='react-app.jsx', v='react-ui-2') }}"></script>
-    <script>
-      window.addEventListener('load', function () {
-        if (!window.React || !window.ReactDOM) {
-          var fallback = document.createElement('script');
-          fallback.src = "{{ url_for('static', filename='app.js', v='offline-fallback-1') }}";
-          document.body.appendChild(fallback);
-        }
-      });
-    </script>
+    <script src="{{ url_for('static', filename='app.js', v='working-local-ui-1') }}"></script>
   </body>
 </html>
